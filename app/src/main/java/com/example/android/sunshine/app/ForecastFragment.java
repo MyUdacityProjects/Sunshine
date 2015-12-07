@@ -11,8 +11,10 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
+import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -93,6 +95,14 @@ public class ForecastFragment extends Fragment {
                 weekForecast);
         ListView weatherListView = (ListView) rootView.findViewById(R.id.listview_forecast);
         weatherListView.setAdapter(mForecastAdapter);
+
+        weatherListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                String weatherForecast = mForecastAdapter.getItem(position);
+                Toast.makeText(getActivity(),weatherForecast,Toast.LENGTH_SHORT).show();
+            }
+        });
         return rootView;
     }
 
