@@ -1,8 +1,11 @@
 package com.example.android.sunshine.app;
 
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -14,7 +17,6 @@ import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
-import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -28,14 +30,15 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Date;
 import java.util.GregorianCalendar;
-import java.util.List;
 
 public class ForecastFragment extends Fragment {
 
     ArrayAdapter<String> mForecastAdapter;
+    SharedPreferences prefs;
+    public final static String EXTRA_MESSAGE = "MESSAGE";
+
 
     public ForecastFragment() {
     }
@@ -43,12 +46,20 @@ public class ForecastFragment extends Fragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);
+        prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
     }
 
     @Override
     public void onCreateOptionsMenu(Menu menu, MenuInflater menuInflater) {
         // Inflate the menu; this adds items to the action bar if it is present.
         menuInflater.inflate(R.menu.main, menu);
+    }
+
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        updateWeather();
     }
 
     @Override
@@ -60,15 +71,27 @@ public class ForecastFragment extends Fragment {
 
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_settings) {
+            startActivity(new Intent(getActivity(), SettingsActivity.class));
+            return true;
+        }
+
+        if (id == R.id.action_showOnMap) {
+            showMap();
             return true;
         }
 
         if (id == R.id.action_refresh) {
-            new FetchWeatherTask().execute("94043");
+            updateWeather();
             return true;
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+    private void updateWeather() {
+        String loc = prefs.getString(getString(R.string.pref_location_key), getString(R.string.pref_location_default));
+        String unit = prefs.getString(getString(R.string.pref_unit_key), getString(R.string.pref_unit_default));
+        new FetchWeatherTask().execute(loc,unit);
     }
 
     @Override
@@ -76,23 +99,13 @@ public class ForecastFragment extends Fragment {
                              Bundle savedInstanceState) {
 
         View rootView = inflater.inflate(R.layout.fragment_main, container, false);
-        String[] data = {
-                "Mon 6/23 - Sunny - 31/17",
-                "Tue 6/24 - Foggy - 21/8",
-                "Wed 6/25 - Cloudy - 22/17",
-                "Thurs 6/26 - Rainy - 18/11",
-                "Fri 6/27 - Foggy - 21/10",
-                "Sat 6/28 - TRAPPED IN WEATHER - 23/18",
-                "Sun 6/29 - Sunny - 20/7"
-        };
 
-
-        List<String> weekForecast = new ArrayList<>(Arrays.asList(data));
         mForecastAdapter = new ArrayAdapter<String>(
                 getActivity(),
                 R.layout.list_item_forecast,
                 R.id.list_item_forecast_textview,
-                weekForecast);
+                new ArrayList<String>());
+
         ListView weatherListView = (ListView) rootView.findViewById(R.id.listview_forecast);
         weatherListView.setAdapter(mForecastAdapter);
 
@@ -100,16 +113,28 @@ public class ForecastFragment extends Fragment {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 String weatherForecast = mForecastAdapter.getItem(position);
-                Toast.makeText(getActivity(),weatherForecast,Toast.LENGTH_SHORT).show();
+                Intent intent = new Intent(getActivity(), DetailActivity.class);
+                intent.putExtra(EXTRA_MESSAGE, weatherForecast);
+                startActivity(intent);
             }
         });
         return rootView;
     }
 
     private String getReadableDateString(Date day) {
-        
+
         SimpleDateFormat shortenedDateFormat = new SimpleDateFormat("EEE MMM dd");
         return shortenedDateFormat.format(day);
+    }
+
+    private void showMap() {
+        String loc = prefs.getString(getString(R.string.pref_location_key), getString(R.string.pref_location_default));
+        Uri geoLocation = Uri.parse("geo:0,0?q=" + loc);
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.setData(geoLocation);
+        if (intent.resolveActivity(getActivity().getPackageManager()) != null) {
+            startActivity(intent);
+        }
     }
 
     /**
@@ -168,7 +193,6 @@ public class ForecastFragment extends Fragment {
         }
 
 
-
         return forecastString;
     }
 
@@ -183,7 +207,6 @@ public class ForecastFragment extends Fragment {
             String forecastJsonStr = null;
             String[] forecastString = null;
 
-            String units = "metric";
             Integer numDays = 7;
             String mode = "json";
 
@@ -199,7 +222,7 @@ public class ForecastFragment extends Fragment {
                 Uri uri = Uri.parse(BASE_URL).buildUpon().
                         appendQueryParameter(ZIP_QUERY_PARAM, params[0]).
                         appendQueryParameter(APPID_QUERY_PARAM, BuildConfig.OPEN_WEATHER_MAP_API_KEY).
-                        appendQueryParameter(UNITS_QUERY_PARAM, units).
+                        appendQueryParameter(UNITS_QUERY_PARAM, params[1]).
                         appendQueryParameter(CNT_QUERY_PARAM, Integer.toString(numDays)).
                         appendQueryParameter(MODE_QUERY_PARAM, mode).build();
 
@@ -262,7 +285,7 @@ public class ForecastFragment extends Fragment {
         protected void onPostExecute(String[] forecastString) {
             super.onPostExecute(forecastString);
             mForecastAdapter.clear();
-            for(String s: forecastString){
+            for (String s : forecastString) {
                 mForecastAdapter.add(s);
             }
         }
